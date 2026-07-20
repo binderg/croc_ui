@@ -38,7 +38,17 @@
       "Bash(cd \"/c/Users/justf/Program Files/Go/pkg/mod/github.com/wailsapp/wails/v2@v2.13.0\" && grep -rn \"enableWailsDragAndDrop\" --include=*.go --include=*.js . | grep -v runtime_prod_desktop.js | head -20)",
       "Bash(cd \"/c/Users/justf/Program Files/Go/pkg/mod/github.com/wailsapp/wails/v2@v2.13.0\" && grep -rn \"processMessage\\\\|ProcessMessage\" --include=*.go internal/frontend/devserver/ internal/frontend/desktop/windows/frontend.go | head -20)",
       "Read(//c/Users/justf/Program Files/Go/pkg/mod/github.com/wailsapp/wails/v2@v2.13.0/internal/frontend/devserver/**)",
-      "Read(//c/Users/justf/Program Files/Go/pkg/mod/github.com/wailsapp/wails/v2@v2.13.0/pkg/runtime/**)"
+      "Read(//c/Users/justf/Program Files/Go/pkg/mod/github.com/wailsapp/wails/v2@v2.13.0/pkg/runtime/**)",
+      "Bash(curl -sL -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/120.0 Safari/537.36\" \"https://fonts.googleapis.com/css2?family=Outfit:wght@300..700&display=swap\")",
+      "Bash(curl -sL -o outfit-var-latin.woff2 \"https://fonts.gstatic.com/s/outfit/v15/QGYvz_MVcBeNP4NJtEtq.woff2\")",
+      "PowerShell($cert = New-SelfSignedCertificate -Type Custom -Subject \"CN=Gershon Binder\" -KeyUsage DigitalSignature -FriendlyName \"CrocTransferCert\" -CertStoreLocation \"Cert:\\\\CurrentUser\\\\My\" -TextExtension @\\(\"2.5.29.37={text}1.3.6.1.5.5.7.3.3\"\\); Write-Host \"Cert created. Thumbprint: $\\($cert.Thumbprint\\)\")",
+      "PowerShell(Get-Command signtool -ErrorAction SilentlyContinue)",
+      "PowerShell(winget install Microsoft.WindowsSDK.10.0.22621 -e --accept-source-agreements --accept-package-agreements)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\justf\\scoop-croctrx\\bucket",
+      "C:\\Users\\justf\\scoop-croctrx",
+      "C:\\Users\\justf"
     ]
   }
 }

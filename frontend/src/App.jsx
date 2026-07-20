@@ -1,5 +1,24 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
+    ArrowsLeftRight,
+    ArrowUpRight,
+    CheckCircle,
+    Copy,
+    CopySimple,
+    Files,
+    FolderOpen,
+    LockKey,
+    Minus,
+    Plus,
+    ShieldCheck,
+    Square,
+    Trash,
+    UserCircleMinus,
+    Warning,
+    X,
+} from '@phosphor-icons/react'
+
+import {
     AppInfo,
     Cancel,
     CheckForUpdates,
@@ -14,7 +33,22 @@ import {
     Receive,
     Send,
 } from '../wailsjs/go/main/App'
-import {EventsOn, OnFileDrop, OnFileDropOff} from '../wailsjs/runtime/runtime'
+import {
+    EventsOn,
+    OnFileDrop,
+    OnFileDropOff,
+    Quit,
+    WindowIsMaximised,
+    WindowMinimise,
+    WindowToggleMaximise,
+} from '../wailsjs/runtime/runtime'
+
+import Lottie from './Lottie'
+import logo from './assets/images/croc_ui logo.png'
+import uploadAnim from './assets/lotties/upload.json'
+import downloadAnim from './assets/lotties/download.json'
+import loadingAnim from './assets/lotties/Loading.json'
+import progressAnim from './assets/lotties/Downloading Progress.json'
 
 const IDLE = {phase: 'idle', active: false}
 
@@ -38,14 +72,13 @@ function formatSpeed(bps) {
 function formatEta(seconds) {
     if (!seconds || seconds <= 0 || !isFinite(seconds)) return ''
     const s = Math.round(seconds)
-    if (s < 60) return `${s}s left`
+    if (s < 60) return `${s} sec left`
     const m = Math.floor(s / 60)
-    if (m < 60) return `${m}m ${s % 60}s left`
-    return `${Math.floor(m / 60)}h ${m % 60}m left`
+    if (m < 60) return `${m} min left`
+    return `${Math.floor(m / 60)} hr ${m % 60} min left`
 }
 
 export default function App() {
-    const [tab, setTab] = useState('send')
     const [files, setFiles] = useState([])
     const [code, setCode] = useState('')
     const [receiveCode, setReceiveCode] = useState('')
@@ -71,18 +104,16 @@ export default function App() {
             setLog((prev) => [...prev.slice(-300), line])
         })
 
-        // This must be the JS runtime's OnFileDrop, not the Go one: only this
+        // Must be the JS runtime's OnFileDrop, not the Go one: only this
         // attaches the DOM listeners that preventDefault the drop. Without it
-        // the webview navigates to the dropped file instead.
+        // the webview navigates to the dropped file.
         OnFileDrop((x, y, paths) => {
             dragDepth.current = 0
             setDragging(false)
             if (!paths || !paths.length) return
             Describe(paths)
                 .then((entries) => {
-                    if (!entries?.length) return
-                    setTab('send')
-                    setFiles((prev) => mergeFiles(prev, entries))
+                    if (entries?.length) setFiles((prev) => mergeFiles(prev, entries))
                 })
                 .catch(() => {})
         }, true)
@@ -94,8 +125,7 @@ export default function App() {
         }
     }, [])
 
-    // The webview still fires HTML drag events; use them only for the drop
-    // highlight. Wails supplies the real file paths via the files:dropped event.
+    // Wails owns the actual drop; these listeners only drive the highlight.
     useEffect(() => {
         const onOver = (e) => e.preventDefault()
         const onEnter = (e) => {
@@ -126,6 +156,7 @@ export default function App() {
     const busy = progress.active
     const phase = progress.phase || 'idle'
     const showResult = phase === 'done' || phase === 'error' || phase === 'cancelled'
+    const idle = !busy && !showResult
 
     const totalSize = useMemo(
         () => files.reduce((sum, f) => sum + (f.size || 0), 0),
@@ -134,7 +165,7 @@ export default function App() {
 
     const flash = useCallback((msg) => {
         setBanner(msg)
-        setTimeout(() => setBanner(''), 4000)
+        setTimeout(() => setBanner(''), 4200)
     }, [])
 
     const addFiles = async (picker) => {
@@ -150,8 +181,7 @@ export default function App() {
         if (!files.length) return
         setLog([])
         try {
-            const generated = await Send(files.map((f) => f.path), code.trim())
-            setCode(generated)
+            setCode(await Send(files.map((f) => f.path), code.trim()))
         } catch (e) {
             flash(String(e))
         }
@@ -177,7 +207,7 @@ export default function App() {
             setCopied(true)
             setTimeout(() => setCopied(false), 1800)
         } catch {
-            flash('Could not copy — select the code and copy it manually.')
+            flash('Could not copy. Select the code and copy it manually.')
         }
     }
 
@@ -190,106 +220,85 @@ export default function App() {
         setLog([])
     }
 
-    const updateAvailable = updates?.crocui?.available
-
     return (
-        <div className={`app${dragging ? ' app--dragging' : ''}`}>
-            <header className="topbar">
-                <div className="brand">
-                    <CrocMark/>
-                    <div>
-                        <h1>Croc Transfer</h1>
-                        <p>Send files to anyone, end-to-end encrypted</p>
-                    </div>
-                </div>
-                <UpdatePill
-                    updates={updates}
-                    info={info}
-                    onRefresh={() => CheckForUpdates(true).then(setUpdates)}
-                    onOpen={(url) => OpenURL(url)}
-                />
-            </header>
+        <div className="app">
+            <TitleBar
+                info={info}
+                updates={updates}
+                onRefresh={() => CheckForUpdates(true).then(setUpdates)}
+                onOpen={OpenURL}
+            />
 
-            {updateAvailable && (
-                <button className="update-banner" onClick={() => OpenURL(updates.crocui.url)}>
-                    <strong>Version {updates.crocui.latest} is available.</strong>
-                    <span>You have {updates.crocui.current}. Click to download.</span>
-                </button>
-            )}
-
-            {banner && <div className="banner">{banner}</div>}
-
-            {!busy && !showResult && (
-                <nav className="tabs" role="tablist">
+            <div className="body">
+                {updates?.crocui?.available && (
                     <button
-                        role="tab"
-                        aria-selected={tab === 'send'}
-                        className={tab === 'send' ? 'tab tab--on' : 'tab'}
-                        onClick={() => setTab('send')}
+                        className="notice notice--update"
+                        onClick={() => OpenURL(updates.crocui.url)}
                     >
-                        Send
+                        <ArrowUpRight size={16} weight="bold"/>
+                        <span>
+                            <strong>Version {updates.crocui.latest} is ready.</strong>{' '}
+                            You have {updates.crocui.current}.
+                        </span>
                     </button>
-                    <button
-                        role="tab"
-                        aria-selected={tab === 'receive'}
-                        className={tab === 'receive' ? 'tab tab--on' : 'tab'}
-                        onClick={() => setTab('receive')}
-                    >
-                        Receive
-                    </button>
-                </nav>
-            )}
-
-            <main className="stage">
-                {showResult ? (
-                    <ResultCard
-                        progress={progress}
-                        onOpenFolder={() => OpenFolder(progress.destFolder)}
-                        onAgain={startOver}
-                    />
-                ) : busy ? (
-                    <ActiveCard
-                        progress={progress}
-                        copied={copied}
-                        onCopy={copyCode}
-                        onCancel={() => Cancel()}
-                    />
-                ) : tab === 'send' ? (
-                    <SendCard
-                        files={files}
-                        totalSize={totalSize}
-                        code={code}
-                        setCode={setCode}
-                        onPickFiles={() => addFiles(PickFiles)}
-                        onPickFolder={() => addFiles(PickFolderToSend)}
-                        onRemove={(path) => setFiles((prev) => prev.filter((f) => f.path !== path))}
-                        onClear={() => setFiles([])}
-                        onStart={startSend}
-                    />
-                ) : (
-                    <ReceiveCard
-                        code={receiveCode}
-                        setCode={setReceiveCode}
-                        dest={dest}
-                        onPickDest={async () => {
-                            const d = await PickDestination()
-                            if (d) setDest(d)
-                        }}
-                        onStart={startReceive}
-                    />
                 )}
-            </main>
-
-            <LogPane log={log} open={showLog} onToggle={() => setShowLog((v) => !v)}/>
-
-            {dragging && (
-                <div className="dropveil">
-                    <div className="dropveil__inner">
-                        <DropIcon/>
-                        <p>Drop to add files</p>
+                {banner && (
+                    <div className="notice notice--warn">
+                        <Warning size={16} weight="fill"/>
+                        <span>{banner}</span>
                     </div>
-                </div>
-            )}
+                )}
+
+                {showResult ? (
+                    <div className="solo">
+                        <ResultPanel
+                            progress={progress}
+                            onOpenFolder={() => OpenFolder(progress.destFolder)}
+                            onAgain={startOver}
+                        />
+                    </div>
+                ) : busy ? (
+                    <div className="solo">
+                        <ActivePanel
+                            progress={progress}
+                            copied={copied}
+                            onCopy={copyCode}
+                            onCancel={Cancel}
+                        />
+                    </div>
+                ) : (
+                    <div className="duo">
+                        <SendCard
+                            files={files}
+                            totalSize={totalSize}
+                            code={code}
+                            setCode={setCode}
+                            dragging={dragging}
+                            onPickFiles={() => addFiles(PickFiles)}
+                            onPickFolder={() => addFiles(PickFolderToSend)}
+                            onRemove={(p) => setFiles((f) => f.filter((x) => x.path !== p))}
+                            onClear={() => setFiles([])}
+                            onStart={startSend}
+                        />
+                        <ReceiveCard
+                            code={receiveCode}
+                            setCode={setReceiveCode}
+                            dest={dest}
+                            onPickDest={async () => {
+                                const d = await PickDestination()
+                                if (d) setDest(d)
+                            }}
+                            onStart={startReceive}
+                        />
+                    </div>
+                )}
+
+                {idle && <TrustStrip/>}
+
+                <LogPane log={log} open={showLog} onToggle={() => setShowLog((v) => !v)}/>
+            </div>
+
+            {dragging && <DropVeil/>}
         </div>
     )
 }
@@ -299,233 +308,105 @@ function mergeFiles(prev, incoming) {
     return [...prev, ...incoming.filter((f) => !seen.has(f.path))]
 }
 
-function SendCard({
-    files, totalSize, code, setCode,
-    onPickFiles, onPickFolder, onRemove, onClear, onStart,
-}) {
-    return (
-        <section className="card">
-            {files.length === 0 ? (
-                <div className="dropzone">
-                    <DropIcon/>
-                    <h2>Drag files here</h2>
-                    <p>or pick them yourself</p>
-                    <div className="row">
-                        <button className="btn" onClick={onPickFiles}>Choose files</button>
-                        <button className="btn" onClick={onPickFolder}>Choose a folder</button>
-                    </div>
-                </div>
-            ) : (
-                <>
-                    <div className="listhead">
-                        <h2>
-                            {files.length} item{files.length > 1 ? 's' : ''} · {formatBytes(totalSize)}
-                        </h2>
-                        <div className="row">
-                            <button className="btn btn--quiet" onClick={onPickFiles}>Add more</button>
-                            <button className="btn btn--quiet" onClick={onClear}>Clear</button>
-                        </div>
-                    </div>
+/* -------------------------------------------------------------- title bar */
 
-                    <ul className="filelist">
-                        {files.map((f) => (
-                            <li key={f.path}>
-                                <span className="filelist__icon">{f.isDir ? '📁' : '📄'}</span>
-                                <span className="filelist__name" title={f.path}>{f.name}</span>
-                                <span className="filelist__size">{formatBytes(f.size)}</span>
-                                <button
-                                    className="filelist__x"
-                                    onClick={() => onRemove(f.path)}
-                                    aria-label={`Remove ${f.name}`}
-                                >
-                                    ×
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-
-                    <details className="advanced">
-                        <summary>Use my own code word</summary>
-                        <input
-                            className="input"
-                            placeholder="Leave empty for a random code"
-                            value={code}
-                            onChange={(e) => setCode(e.target.value)}
-                        />
-                        <p className="hint">
-                            At least 6 characters. Anyone with this code can receive the files.
-                        </p>
-                    </details>
-
-                    <button className="btn btn--primary btn--big" onClick={onStart}>
-                        Start sending
-                    </button>
-                </>
-            )}
-        </section>
-    )
-}
-
-function ReceiveCard({code, setCode, dest, onPickDest, onStart}) {
-    return (
-        <section className="card">
-            <div className="receive">
-                <h2>Enter the code you were given</h2>
-                <input
-                    className="input input--code"
-                    placeholder="e.g. 1234-word-word-word"
-                    value={code}
-                    autoFocus
-                    spellCheck={false}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    onChange={(e) => setCode(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && onStart()}
-                />
-
-                <div className="destrow">
-                    <div className="destrow__text">
-                        <span className="destrow__label">Save to</span>
-                        <span className="destrow__path" title={dest}>{dest || '…'}</span>
-                    </div>
-                    <button className="btn btn--quiet" onClick={onPickDest}>Change</button>
-                </div>
-
-                <button
-                    className="btn btn--primary btn--big"
-                    onClick={onStart}
-                    disabled={code.trim().length < 6}
-                >
-                    Start receiving
-                </button>
-            </div>
-        </section>
-    )
-}
-
-function ActiveCard({progress, copied, onCopy, onCancel}) {
-    const sending = progress.mode === 'send'
-    const waiting = progress.phase === 'waiting' || progress.phase === 'connecting'
-    const pct = Math.max(0, Math.min(100, progress.percent || 0))
-    const showBar = !waiting || progress.bytesDone > 0
-
-    return (
-        <section className="card">
-            {sending && progress.code && (
-                <div className="codeblock">
-                    <span className="codeblock__label">Give this code to the other person</span>
-                    <div className="codeblock__value">
-                        <code>{progress.code}</code>
-                        <button className="btn btn--quiet" onClick={onCopy}>
-                            {copied ? 'Copied' : 'Copy'}
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <div className="status">
-                {waiting && <span className="spinner"/>}
-                <span>{progress.message || (sending ? 'Sending' : 'Receiving')}</span>
-            </div>
-
-            {showBar && (
-                <div className="progress">
-                    <div className="progress__track">
-                        <div
-                            className={`progress__fill${progress.bytesTotal ? '' : ' progress__fill--pulse'}`}
-                            style={{width: progress.bytesTotal ? `${pct}%` : '100%'}}
-                        />
-                    </div>
-                    <div className="progress__meta">
-                        <span className="progress__pct">
-                            {progress.bytesTotal ? `${pct.toFixed(0)}%` : 'Working…'}
-                        </span>
-                        <span>
-                            {progress.bytesTotal
-                                ? `${formatBytes(progress.bytesDone)} of ${formatBytes(progress.bytesTotal)}`
-                                : formatBytes(progress.bytesDone)}
-                        </span>
-                        <span>{formatSpeed(progress.speedBps)}</span>
-                        <span>{formatEta(progress.etaSeconds)}</span>
-                    </div>
-                    {progress.fileCount > 1 && (
-                        <p className="progress__file">
-                            File {progress.fileIndex} of {progress.fileCount}
-                        </p>
-                    )}
-                </div>
-            )}
-
-            <button className="btn btn--danger" onClick={onCancel}>Cancel</button>
-        </section>
-    )
-}
-
-function ResultCard({progress, onOpenFolder, onAgain}) {
-    const ok = progress.phase === 'done'
-    const cancelled = progress.phase === 'cancelled'
-    const received = progress.mode === 'receive'
-
-    return (
-        <section className="card card--center">
-            <div className={`verdict verdict--${ok ? 'ok' : cancelled ? 'warn' : 'bad'}`}>
-                {ok ? '✓' : cancelled ? '–' : '!'}
-            </div>
-            <h2>
-                {ok
-                    ? received ? 'Files received' : 'Files sent'
-                    : cancelled ? 'Transfer cancelled' : 'Transfer failed'}
-            </h2>
-            {ok && progress.bytesTotal > 0 && (
-                <p className="verdict__sub">{formatBytes(progress.bytesTotal)} transferred</p>
-            )}
-            {!ok && progress.error && <p className="verdict__err">{progress.error}</p>}
-
-            <div className="row">
-                {ok && received && (
-                    <button className="btn btn--primary" onClick={onOpenFolder}>
-                        Open folder
-                    </button>
-                )}
-                <button className="btn" onClick={onAgain}>Start over</button>
-            </div>
-        </section>
-    )
-}
-
-function UpdatePill({updates, info, onRefresh, onOpen}) {
+/**
+ * TitleBar replaces the OS window chrome (the window is Frameless).
+ *
+ * The drag region is declared with --wails-draggable: drag in CSS. The
+ * controls sit outside that region, otherwise dragging would swallow clicks.
+ */
+function TitleBar({info, updates, onRefresh, onOpen}) {
     const [open, setOpen] = useState(false)
+    const [maxed, setMaxed] = useState(false)
     const has = updates?.crocui?.available
 
-    return (
-        <div className="pillwrap">
-            <button
-                className={`pill${has ? ' pill--alert' : ''}`}
-                onClick={() => setOpen((v) => !v)}
-            >
-                v{info.appVersion || '…'}{has ? ' · update' : ''}
-            </button>
+    useEffect(() => {
+        if (!open) return
+        const close = () => setOpen(false)
+        window.addEventListener('click', close)
+        return () => window.removeEventListener('click', close)
+    }, [open])
 
-            {open && (
-                <div className="pillmenu">
-                    <VersionRow
-                        label="Croc Transfer"
-                        current={info.appVersion}
-                        entry={updates?.crocui}
-                        onOpen={onOpen}
-                    />
-                    <VersionRow
-                        label="croc engine"
-                        current={info.crocVersion}
-                        entry={updates?.croc}
-                        onOpen={onOpen}
-                    />
-                    <button className="btn btn--quiet btn--full" onClick={onRefresh}>
-                        Check again
+    // The window can also be maximised by dragging to the screen edge or by
+    // double-clicking the drag region, so the icon is polled, not toggled.
+    useEffect(() => {
+        let alive = true
+        const sync = () => {
+            WindowIsMaximised()
+                .then((v) => alive && setMaxed(v))
+                .catch(() => {})
+        }
+        sync()
+        const id = setInterval(sync, 600)
+        window.addEventListener('resize', sync)
+        return () => {
+            alive = false
+            clearInterval(id)
+            window.removeEventListener('resize', sync)
+        }
+    }, [])
+
+    return (
+        <header className="titlebar">
+            <div className="titlebar__drag" onDoubleClick={WindowToggleMaximise}>
+                <div className="wordmark">
+                    <img className="wordmark__logo" src={logo} alt="" width="26" height="26"/>
+                    <span className="wordmark__text">Croc</span>
+                </div>
+            </div>
+
+            <div className="titlebar__right">
+                <div className="verwrap" onClick={(e) => e.stopPropagation()}>
+                    <button
+                        className={`chip${has ? ' chip--alert' : ''}`}
+                        onClick={() => setOpen((v) => !v)}
+                        title="Version and updates"
+                    >
+                        {has && <span className="chip__dot"/>}
+                        {info.appVersion ? `v${info.appVersion}` : '...'}
+                    </button>
+
+                    {open && (
+                        <div className="vermenu">
+                            <VersionRow
+                                label="This app"
+                                current={info.appVersion}
+                                entry={updates?.crocui}
+                                onOpen={onOpen}
+                            />
+                            <VersionRow
+                                label="croc engine"
+                                current={info.crocVersion}
+                                entry={updates?.croc}
+                                onOpen={onOpen}
+                            />
+                            <button className="vermenu__refresh" onClick={onRefresh}>
+                                Check again
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="wctl">
+                    <button className="wctl__b" onClick={WindowMinimise} aria-label="Minimise">
+                        <Minus size={14} weight="bold"/>
+                    </button>
+                    <button
+                        className="wctl__b"
+                        onClick={WindowToggleMaximise}
+                        aria-label={maxed ? 'Restore' : 'Maximise'}
+                    >
+                        {maxed
+                            ? <CopySimple size={13} weight="bold"/>
+                            : <Square size={12} weight="bold"/>}
+                    </button>
+                    <button className="wctl__b wctl__b--close" onClick={Quit} aria-label="Close">
+                        <X size={14} weight="bold"/>
                     </button>
                 </div>
-            )}
-        </div>
+            </div>
+        </header>
     )
 }
 
@@ -534,22 +415,312 @@ function VersionRow({label, current, entry, onOpen}) {
         <div className="vrow">
             <div className="vrow__top">
                 <span className="vrow__label">{label}</span>
-                <span className="vrow__ver">{current || '…'}</span>
+                <span className="vrow__ver">{current || '...'}</span>
             </div>
             {entry?.error ? (
                 <span className="vrow__note">{entry.error}</span>
             ) : entry?.available ? (
                 <button className="vrow__link" onClick={() => onOpen(entry.url)}>
-                    {entry.latest} available →
+                    {entry.latest} available
                 </button>
             ) : entry?.latest ? (
                 <span className="vrow__note">Up to date</span>
             ) : (
-                <span className="vrow__note">Checking…</span>
+                <span className="vrow__note">Checking</span>
             )}
         </div>
     )
 }
+
+/* ------------------------------------------------------------ trust strip */
+
+const TRUST = [
+    {
+        Icon: LockKey,
+        title: 'End-to-end encrypted',
+        body: 'The code creates the key.',
+    },
+    {
+        Icon: UserCircleMinus,
+        title: 'No account, ever',
+        body: 'Nothing to sign up for.',
+    },
+    {
+        Icon: ShieldCheck,
+        title: 'Never stored',
+        body: 'Files pass straight through.',
+    },
+]
+
+function TrustStrip() {
+    return (
+        <ul className="trust">
+            {TRUST.map(({Icon, title, body}) => (
+                <li key={title}>
+                    <Icon size={16} weight="bold"/>
+                    <div>
+                        <strong>{title}</strong>
+                        <span>{body}</span>
+                    </div>
+                </li>
+            ))}
+        </ul>
+    )
+}
+
+/* -------------------------------------------------------------- send card */
+
+function SendCard({
+    files, totalSize, code, setCode, dragging,
+    onPickFiles, onPickFolder, onRemove, onClear, onStart,
+}) {
+    if (!files.length) {
+        return (
+            <section
+                className={`card card--drop${dragging ? ' card--hot' : ''}`}
+                onClick={onPickFiles}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPickFiles()}
+            >
+                <div className="card__art">
+                    <Lottie data={uploadAnim} className="art"/>
+                </div>
+                <h2>Send files</h2>
+                <p className="card__sub">Drop them anywhere, or click to browse</p>
+                <div className="btnrow">
+                    <button
+                        className="btn btn--primary"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onPickFiles()
+                        }}
+                    >
+                        <Files size={17} weight="bold"/> Choose files
+                    </button>
+                    <button
+                        className="btn"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onPickFolder()
+                        }}
+                    >
+                        <FolderOpen size={17} weight="bold"/> Folder
+                    </button>
+                </div>
+            </section>
+        )
+    }
+
+    return (
+        <section className="card">
+            <div className="card__head">
+                <h2>
+                    {files.length} item{files.length > 1 ? 's' : ''}
+                    <span className="card__count">{formatBytes(totalSize)}</span>
+                </h2>
+                <div className="btnrow">
+                    <button className="btn btn--ghost" onClick={onPickFiles}>
+                        <Plus size={15} weight="bold"/> Add
+                    </button>
+                    <button className="btn btn--ghost" onClick={onClear}>
+                        <Trash size={15} weight="bold"/> Clear
+                    </button>
+                </div>
+            </div>
+
+            <ul className="filelist">
+                {files.map((f) => (
+                    <li key={f.path} className="filelist__row">
+                        <span className="filelist__icon">
+                            {f.isDir
+                                ? <FolderOpen size={17} weight="fill"/>
+                                : <Files size={17} weight="fill"/>}
+                        </span>
+                        <span className="filelist__name" title={f.path}>{f.name}</span>
+                        <span className="filelist__size">{formatBytes(f.size)}</span>
+                        <button
+                            className="filelist__x"
+                            onClick={() => onRemove(f.path)}
+                            aria-label={`Remove ${f.name}`}
+                        >
+                            <X size={14} weight="bold"/>
+                        </button>
+                    </li>
+                ))}
+            </ul>
+
+            <details className="more">
+                <summary>Pick my own code word</summary>
+                <input
+                    className="field"
+                    placeholder="Leave empty for a random one"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                />
+                <p className="more__hint">
+                    At least 6 characters. Anyone with this code can receive the files.
+                </p>
+            </details>
+
+            <button className="btn btn--primary btn--wide" onClick={onStart}>
+                <ArrowsLeftRight size={18} weight="bold"/> Start sending
+            </button>
+        </section>
+    )
+}
+
+/* ----------------------------------------------------------- receive card */
+
+function ReceiveCard({code, setCode, dest, onPickDest, onStart}) {
+    const ready = code.trim().length >= 6
+    return (
+        <section className="card card--receive">
+            <div className="card__art">
+                <Lottie data={downloadAnim} className="art"/>
+            </div>
+            <h2>Receive files</h2>
+            <p className="card__sub">Type the code the sender gave you</p>
+
+            <input
+                className="field field--code"
+                placeholder="1234-word-word-word"
+                value={code}
+                spellCheck={false}
+                autoCapitalize="none"
+                autoCorrect="off"
+                onChange={(e) => setCode(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && ready && onStart()}
+            />
+
+            <button className="saveto" onClick={onPickDest}>
+                <FolderOpen size={17} weight="fill"/>
+                <span className="saveto__text">
+                    <span className="saveto__label">Save to</span>
+                    <span className="saveto__path" title={dest}>{dest || '...'}</span>
+                </span>
+                <span className="saveto__change">Change</span>
+            </button>
+
+            <button
+                className="btn btn--primary btn--wide"
+                onClick={onStart}
+                disabled={!ready}
+            >
+                Start receiving
+            </button>
+        </section>
+    )
+}
+
+/* ----------------------------------------------------------- active panel */
+
+function ActivePanel({progress, copied, onCopy, onCancel}) {
+    const sending = progress.mode === 'send'
+    const waiting = progress.phase === 'waiting' || progress.phase === 'connecting'
+    const pct = Math.max(0, Math.min(100, progress.percent || 0))
+    const known = progress.bytesTotal > 0
+
+    return (
+        <section className="card card--stack">
+            {sending && progress.code && (
+                <div className="codecard">
+                    <span className="codecard__label">Give this code to the other person</span>
+                    <div className="codecard__row">
+                        <code>{progress.code}</code>
+                        <button className="btn btn--onbrand" onClick={onCopy}>
+                            {copied
+                                ? <><CheckCircle size={16} weight="fill"/> Copied</>
+                                : <><Copy size={16} weight="bold"/> Copy</>}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div className="working">
+                <Lottie data={waiting ? loadingAnim : progressAnim} className="art art--sm"/>
+                <div className="working__text">
+                    <strong>{progress.message || (sending ? 'Sending' : 'Receiving')}</strong>
+                    {progress.fileCount > 1 && (
+                        <span>File {progress.fileIndex} of {progress.fileCount}</span>
+                    )}
+                </div>
+            </div>
+
+            <div className="meter">
+                <div className="meter__track">
+                    <div
+                        className={`meter__fill${known ? '' : ' meter__fill--idle'}`}
+                        style={{width: known ? `${pct}%` : '100%'}}
+                    />
+                </div>
+                <div className="meter__meta">
+                    <span className="meter__pct">{known ? `${pct.toFixed(0)}%` : 'Working'}</span>
+                    <span>
+                        {known
+                            ? `${formatBytes(progress.bytesDone)} of ${formatBytes(progress.bytesTotal)}`
+                            : formatBytes(progress.bytesDone)}
+                    </span>
+                    <span>{formatSpeed(progress.speedBps)}</span>
+                    <span>{formatEta(progress.etaSeconds)}</span>
+                </div>
+            </div>
+
+            <button className="btn btn--danger" onClick={onCancel}>Cancel</button>
+        </section>
+    )
+}
+
+/* ----------------------------------------------------------- result panel */
+
+function ResultPanel({progress, onOpenFolder, onAgain}) {
+    const ok = progress.phase === 'done'
+    const cancelled = progress.phase === 'cancelled'
+    const received = progress.mode === 'receive'
+
+    return (
+        <section className="card card--center">
+            <div className={`seal seal--${ok ? 'ok' : cancelled ? 'warn' : 'bad'}`}>
+                {ok ? <CheckCircle size={34} weight="fill"/> : <Warning size={32} weight="fill"/>}
+            </div>
+
+            <h2>
+                {ok
+                    ? received ? 'Files received' : 'Files sent'
+                    : cancelled ? 'Transfer cancelled' : 'Transfer failed'}
+            </h2>
+
+            {ok && progress.bytesTotal > 0 && (
+                <p className="seal__sub">{formatBytes(progress.bytesTotal)} transferred safely</p>
+            )}
+            {!ok && progress.error && <p className="seal__sub">{progress.error}</p>}
+
+            <div className="btnrow">
+                {ok && received && (
+                    <button className="btn btn--primary" onClick={onOpenFolder}>
+                        <FolderOpen size={17} weight="bold"/> Open folder
+                    </button>
+                )}
+                <button className="btn" onClick={onAgain}>Start over</button>
+            </div>
+        </section>
+    )
+}
+
+/* -------------------------------------------------------------- drop veil */
+
+function DropVeil() {
+    return (
+        <div className="veil">
+            <div className="veil__box">
+                <Lottie data={uploadAnim} className="art"/>
+                <p>Drop to add</p>
+            </div>
+        </div>
+    )
+}
+
+/* ------------------------------------------------------------------- logs */
 
 function LogPane({log, open, onToggle}) {
     const ref = useRef(null)
@@ -559,46 +730,11 @@ function LogPane({log, open, onToggle}) {
 
     if (!log.length) return null
     return (
-        <footer className="logpane">
-            <button className="logpane__toggle" onClick={onToggle}>
+        <footer className="logs">
+            <button className="logs__toggle" onClick={onToggle}>
                 {open ? 'Hide details' : 'Show details'}
             </button>
-            {open && <pre className="logpane__body" ref={ref}>{log.join('\n')}</pre>}
+            {open && <pre className="logs__body" ref={ref}>{log.join('\n')}</pre>}
         </footer>
-    )
-}
-
-function DropIcon() {
-    return (
-        <svg className="icon-drop" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-            <path
-                d="M24 32V10m0 0-8 8m8-8 8 8"
-                stroke="currentColor" strokeWidth="3"
-                strokeLinecap="round" strokeLinejoin="round"
-            />
-            <path
-                d="M8 30v4a6 6 0 0 0 6 6h20a6 6 0 0 0 6-6v-4"
-                stroke="currentColor" strokeWidth="3" strokeLinecap="round"
-            />
-        </svg>
-    )
-}
-
-function CrocMark() {
-    return (
-        <svg className="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-            <rect width="32" height="32" rx="9" fill="url(#croc-mark)"/>
-            <path
-                d="M10 16h12m0 0-4.5-4.5M22 16l-4.5 4.5"
-                stroke="#fff" strokeWidth="2.4"
-                strokeLinecap="round" strokeLinejoin="round"
-            />
-            <defs>
-                <linearGradient id="croc-mark" x1="0" y1="0" x2="32" y2="32">
-                    <stop stopColor="#3ddc97"/>
-                    <stop offset="1" stopColor="#12a06b"/>
-                </linearGradient>
-            </defs>
-        </svg>
     )
 }

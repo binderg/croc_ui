@@ -16,11 +16,16 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:         "Croc Transfer",
-		Width:         900,
-		Height:        680,
-		MinWidth:      640,
-		MinHeight:     560,
+		Title:     "Croc Transfer",
+		Width:     900,
+		Height:    680,
+		MinWidth:  640,
+		MinHeight: 560,
+
+		// The window chrome is drawn by the frontend (see TitleBar in App.jsx)
+		// so the controls match the app instead of the OS shell. DisableResize
+		// must stay false or Wails will not arm the frameless resize edges.
+		Frameless:     true,
 		DisableResize: false,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
