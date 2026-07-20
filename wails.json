@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "crocui",
+  "outputfilename": "Croc Transfer",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "binderg",
+    "email": "gershonbinder@gmail.com"
+  },
+  "info": {
+    "productName": "Croc Transfer",
+    "productVersion": "1.0.0",
+    "companyName": "binderg",
+    "comments": "Send files to anyone, end-to-end encrypted. Powered by croc."
+  }
+}
