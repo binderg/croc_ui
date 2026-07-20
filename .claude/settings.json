@@ -43,7 +43,15 @@
       "Bash(curl -sL -o outfit-var-latin.woff2 \"https://fonts.gstatic.com/s/outfit/v15/QGYvz_MVcBeNP4NJtEtq.woff2\")",
       "PowerShell($cert = New-SelfSignedCertificate -Type Custom -Subject \"CN=Gershon Binder\" -KeyUsage DigitalSignature -FriendlyName \"CrocTransferCert\" -CertStoreLocation \"Cert:\\\\CurrentUser\\\\My\" -TextExtension @\\(\"2.5.29.37={text}1.3.6.1.5.5.7.3.3\"\\); Write-Host \"Cert created. Thumbprint: $\\($cert.Thumbprint\\)\")",
       "PowerShell(Get-Command signtool -ErrorAction SilentlyContinue)",
-      "PowerShell(winget install Microsoft.WindowsSDK.10.0.22621 -e --accept-source-agreements --accept-package-agreements)"
+      "PowerShell(winget install Microsoft.WindowsSDK.10.0.22621 -e --accept-source-agreements --accept-package-agreements)",
+      "Bash(python3 -c ' *)",
+      "Bash(magick -version)",
+      "Bash(convert -version)",
+      "Bash(xxd build/windows/icon.ico)",
+      "PowerShell(Copy-Item \"c:\\\\Users\\\\justf\\\\Downloads\\\\croc_ui\\\\build\\\\bin\\\\Croc Transfer.exe\" \"c:\\\\Users\\\\justf\\\\Downloads\\\\croc_ui\\\\build\\\\bin\\\\croc_ui.exe\" -Force)",
+      "PowerShell(& \"C:\\\\Users\\\\justf\\\\sign-exe.ps1\" -ExePath \"c:\\\\Users\\\\justf\\\\Downloads\\\\croc_ui\\\\build\\\\bin\\\\croc_ui.exe\")",
+      "PowerShell($p = \"c:\\\\Users\\\\justf\\\\Downloads\\\\croc_ui\\\\build\\\\bin\\\\croc_ui.exe\"; $h = \\(Get-FileHash $p -Algorithm SHA256\\).Hash; Write-Host $h; \"$h\" | Out-File \"$p.sha256\" -Encoding ascii -NoNewline; Write-Host \"wrote $p.sha256\")",
+      "Read(//c/Users/justf/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\justf\\scoop-croctrx\\bucket",
