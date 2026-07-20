@@ -18,6 +18,42 @@ run. One executable, double-click, done.
 Files go directly between the two computers whenever possible. Anything that
 crosses the relay is encrypted, and the relay never has the key.
 
+## Download
+
+Grab the latest build from the
+[releases page](https://github.com/binderg/croc_ui/releases/latest).
+
+### Windows
+
+Download `croc_ui.exe` and double-click it. Windows SmartScreen may warn about
+an unknown publisher (the app is self-signed) — click **More info → Run anyway**.
+
+Or install with [Scoop](https://scoop.sh):
+
+```powershell
+scoop bucket add croc_ui https://github.com/binderg/scoop-croc_ui
+scoop install croc_ui/croc_ui
+```
+
+### macOS
+
+Download `croc_ui.app.zip`, unzip, and drag **Croc Transfer** into
+`/Applications`. The app is unsigned, so the first launch is blocked — right-click
+the app, choose **Open**, then **Open** again. Or clear the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Croc Transfer.app"
+```
+
+### Linux
+
+Download the AppImage, make it executable, and run it:
+
+```bash
+chmod +x croc_ui.AppImage
+./croc_ui.AppImage
+```
+
 ## Building
 
 Requires [Go](https://go.dev/dl/) 1.25+, [Node.js](https://nodejs.org/) 18+, and

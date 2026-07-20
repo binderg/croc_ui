@@ -18,7 +18,7 @@ const AppVersion = "1.0.0"
 
 // CrocUIRepo is the GitHub "owner/name" this app checks for its own updates.
 // Change it to your repository before publishing a release.
-const CrocUIRepo = "binderg/crocui"
+const CrocUIRepo = "binderg/croc_ui"
 
 // CrocRepo is upstream croc, whose library is compiled into this binary.
 const CrocRepo = "schollz/croc"

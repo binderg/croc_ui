@@ -1,0 +1,108 @@
+name: Release
+
+# Runs when you push a version tag, e.g.:
+#   git tag v1.0.0
+#   git push --tags
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # needed to create the GitHub release and upload files
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows/amd64
+            artifact: croc_ui.exe
+            built: "Croc Transfer.exe"
+          - os: macos-latest
+            platform: darwin/universal
+            artifact: croc_ui.app.zip
+          - os: ubuntu-latest
+            platform: linux/amd64
+            artifact: croc_ui.AppImage
+            built: "Croc Transfer"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Wails needs GTK/WebKit to build the GUI on Linux.
+      - name: Install Linux deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build
+        run: wails build -platform ${{ matrix.platform }} -clean
+
+      # --- Package each OS output into the asset name the README expects ---
+
+      - name: Package (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: Copy-Item "build/bin/${{ matrix.built }}" "build/bin/${{ matrix.artifact }}"
+
+      - name: Package (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd build/bin
+          # Wails produces "Croc Transfer.app"; zip it under the release name.
+          ditto -c -k --keepParent "Croc Transfer.app" "${{ matrix.artifact }}"
+
+      - name: Package (Linux → AppImage)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd build/bin
+          # Wrap the single binary as an AppImage.
+          mkdir -p AppDir/usr/bin
+          cp "${{ matrix.built }}" AppDir/usr/bin/croc_ui
+          chmod +x AppDir/usr/bin/croc_ui
+          cat > AppDir/croc_ui.desktop <<'EOF'
+          [Desktop Entry]
+          Name=Croc Transfer
+          Exec=croc_ui
+          Icon=croc_ui
+          Type=Application
+          Categories=Utility;
+          EOF
+          cp ../../build/appicon.png AppDir/croc_ui.png
+          ln -sf usr/bin/croc_ui AppDir/AppRun
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          ./appimagetool-x86_64.AppImage AppDir "${{ matrix.artifact }}"
+
+      - name: Compute SHA256
+        shell: bash
+        run: |
+          cd build/bin
+          sha256sum "${{ matrix.artifact }}" | awk '{print toupper($1)}' > "${{ matrix.artifact }}.sha256"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/bin/${{ matrix.artifact }}
+            build/bin/${{ matrix.artifact }}.sha256
